@@ -27,7 +27,7 @@ jobs:
       - name: Checkout CENTRAL repo (review logic lives here)
         uses: actions/checkout@v4
         with:
-          repository: YOUR_GITHUB_USERNAME/ai-review-central  # ← update this
+          repository: ankithverma04/ai-review-central  # ← update this
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python
