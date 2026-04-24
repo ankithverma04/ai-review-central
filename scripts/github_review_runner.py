@@ -62,17 +62,35 @@ def submit_pr_review(repo: str, pr_number: int, event: str, body: str) -> None:
 def parse_decision(final_answer: str) -> str:
     """
     Extract APPROVE / REQUEST CHANGES / ESCALATE from the LLM's free-text answer.
-    Returns a normalised string: 'APPROVE', 'REQUEST_CHANGES', or 'ESCALATE'.
+    Looks for the decision in order of priority.
     """
     upper = final_answer.upper()
-    if "APPROVE" in upper and "REQUEST" not in upper:
-        return "APPROVE"
+
+    # Check for explicit decision markers first
+    if "FINAL REVIEW DECISION" in upper:
+        # Extract the line immediately after the heading
+        lines = [l.strip() for l in final_answer.splitlines() if l.strip()]
+        for i, line in enumerate(lines):
+            if "FINAL REVIEW DECISION" in line.upper():
+                # Decision is on the next non-empty line
+                if i + 1 < len(lines):
+                    next_line = lines[i + 1].upper()
+                    if "APPROVE" in next_line:
+                        return "APPROVE"
+                    if "REQUEST" in next_line:
+                        return "REQUEST_CHANGES"
+                    if "ESCALATE" in next_line:
+                        return "ESCALATE"
+
+    # Fallback: scan full text
     if "REQUEST CHANGES" in upper or "REQUEST_CHANGES" in upper:
         return "REQUEST_CHANGES"
     if "ESCALATE" in upper:
         return "ESCALATE"
-    # Fallback: be conservative
-    return "REQUEST_CHANGES"
+    if "APPROVE" in upper:
+        return "APPROVE"
+
+    return "REQUEST_CHANGES"  # conservative fallback
 
 
 def extract_confidence(final_answer: str) -> int | None:
