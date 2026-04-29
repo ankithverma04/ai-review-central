@@ -1,56 +1,199 @@
-# {{crew_name}} Crew
+# 🤖 Pull Request Code Review - Agentic System - CrewAI
 
-Welcome to the {{crew_name}} Crew project, powered by [crewAI](https://crewai.com). This template is designed to help you set up a multi-agent AI system with ease, leveraging the powerful and flexible framework provided by crewAI. Our goal is to enable your agents to collaborate effectively on complex tasks, maximizing their collective intelligence and capabilities.
+An agentic, multi-agent PR code review system powered by **CrewAI** and **Groq**.  
+Automatically reviews every Pull Request across all your repos — classifies complexity, runs specialist AI agents, and posts a formal GitHub review (Approve / Request Changes / Escalate).
 
-## Installation
+---
 
-Ensure you have Python >=3.10 <3.14 installed on your system. This project uses [UV](https://docs.astral.sh/uv/) for dependency management and package handling, offering a seamless setup and execution experience.
+## How It Works
 
-First, if you haven't already, install uv:
+```
+Pull Request opened / updated
+           ↓
+   Fetch PR diff (GitHub CLI)
+           ↓
+   Complexity classifier (LLM)
+      ↙           ↘
+  SIMPLE         COMPLEX
+  (~15 sec)      (~90 sec)
+     ↓               ↓
+ Quick LLM     3-Agent Crew
+  Review        · Senior Developer
+                · Security Engineer
+                · Tech Lead
+      ↘           ↙
+    Final Decision
+  APPROVE / REQUEST CHANGES / ESCALATE
+           ↓
+   Posted as GitHub PR Review
+```
+
+---
+
+## Project Structure
+
+```
+ai-review-central/
+├── .github/
+│   └── workflows/
+│       └── reusable_ai_review.yml      # Reusable workflow (called by other repos)
+├── setup/
+│   └── ai_review.yml                   # Caller workflow — copy this into other repos
+├── scripts/
+│   └── github_review_runner.py         # Bridges GitHub diff → CrewAI flow → GitHub API
+├── src/
+│   └── code_review_flow/
+│       ├── main.py                     # Flow definition & routing logic
+│       ├── crews/
+│       │   └── code_review_crew/
+│       │       ├── crew.py             # Agent + task definitions
+│       │       ├── guardrails/
+│       │       │   └── guardrails.py   # Output validation
+│       │       └── config/
+│       │           ├── agents.yaml     # Agent roles & goals
+│       │           └── tasks.yaml      # Task definitions
+│       └── utils.py
+├── app.py                              # Streamlit UI (local use)
+└── pyproject.toml
+```
+
+---
+
+## Agents
+
+| Agent | Role | Responsibility |
+|---|---|---|
+| Senior Developer | Code Quality | Logic, architecture, maintainability |
+| Security Engineer | Security Analysis | Vulnerabilities, injection risks, secrets |
+| Tech Lead | Final Arbiter | Synthesises findings → final decision |
+
+---
+
+## Decision Logic
+
+| Flow Output | GitHub Action | Merge Impact |
+|---|---|---|
+| `APPROVE` | ✅ Formal approval | PR can be merged |
+| `REQUEST CHANGES` | 🔴 Changes requested | Blocks merge |
+| `ESCALATE` | ⚠️ Comment only | Human reviewer notified |
+
+---
+
+## What Triggers SIMPLE vs COMPLEX
+
+| Change Type | Path | Why |
+|---|---|---|
+| README / docs update | SIMPLE | No logic risk |
+| Comment / formatting | SIMPLE | Trivial |
+| Version bump | SIMPLE | Low risk |
+| Auth / login logic | COMPLEX | Security sensitive |
+| Database queries | COMPLEX | SQL risk |
+| API endpoints | COMPLEX | Business logic |
+| File uploads | COMPLEX | Security risk |
+| Payment handling | COMPLEX | High stakes |
+
+---
+
+## Requirements
+
+- Python `>=3.10, <3.14`
+- [uv](https://docs.astral.sh/uv/) for dependency management
+- A [Groq API key](https://console.groq.com)
+- This repo must be **Public** (required for reusable workflows on personal GitHub accounts)
+
+---
+
+## Setting Up the Central Repo (First Time)
+
+### 1. Clone and install dependencies
 
 ```bash
+git clone https://github.com/ankithverma04/PR-review-agentic-system
+cd PR-review-agentic-system
 pip install uv
+uv sync
 ```
 
-Next, navigate to your project directory and install the dependencies:
+### 2. Set your environment variables
 
-(Optional) Lock the dependencies and install them by using the CLI command:
+Create a `.env` file in the root:
+
+```env
+GROQ_API_KEY=your_groq_api_key_here
+```
+
+> ⚠️ Never hardcode API keys in source files. Add `.env` to `.gitignore`.
+
+### 3. Add the secret to GitHub
+
+Go to `PR-review-agentic-system` → **Settings → Secrets and variables → Actions → New repository secret**
+
+| Secret Name | Value |
+|---|---|
+| `GROQ_API_KEY` | Your Groq API key |
+
+### 4. Verify the reusable workflow
+
+Open `.github/workflows/reusable_ai_review.yml` and confirm this line has your username:
+
+```yaml
+repository: ankithverma04/PR-review-agentic-system   # ← update this
+```
+
+---
+
+## Adding the Review to Another Repo
+
+For each repo you want reviewed, you only need to do **3 things**:
+
+### Step 1 — Copy the caller workflow
+
+Copy `setup/ai_review.yml` into the target repo at:
+
+```
+your-other-repo/
+└── .github/
+    └── workflows/
+        └── ai_code_review.yml    ← paste here
+```
+
+The file contents: 
+Copy the [ai_review.yml](setup/ai_review.yml) into your repo.
+  
+### Step 2 — Add the secret
+
+In the target repo → **Settings → Secrets and variables → Actions → New repository secret**
+
+| Secret Name | Value |
+|---|---|
+| `GROQ_API_KEY` | Your Groq API key |
+
+### Step 3 — Commit and push
+
 ```bash
-crewai install
+git add .github/workflows/ai_code_review.yml
+git commit -m "feat: add AI code review"
+git push
 ```
 
-### Customizing
+That's it. The next PR in that repo will be reviewed automatically. ✅
 
-**Add your `OPENAI_API_KEY` into the `.env` file**
+---
 
-- Modify `src/code_review_flow/config/agents.yaml` to define your agents
-- Modify `src/code_review_flow/config/tasks.yaml` to define your tasks
-- Modify `src/code_review_flow/crew.py` to add your own logic, tools and specific args
-- Modify `src/code_review_flow/main.py` to add custom inputs for your agents and tasks
+## Testing the Integration
+→ See the full step-by-step [Testing Guide](TESTING.md)
+---
 
-## Running the Project
+## Tech Stack
 
-To kickstart your flow and begin execution, run this from the root folder of your project:
+| Component | Technology |
+|---|---|
+| Agent framework | [CrewAI](https://crewai.com) |
+| LLM provider | [Groq](https://console.groq.com) |
+| CI/CD | GitHub Actions (Reusable Workflows) |
+| Local UI | Streamlit |
+| Dependency management | uv |
+| Language | Python 3.11 |
 
-```bash
-crewai run
-```
 
-This command initializes the code_review_flow Flow as defined in your configuration.
-
-This example, unmodified, will run the create a `report.md` file with the output of a research on LLMs in the root folder.
-
-## Understanding Your Crew
-
-The code_review_flow Crew is composed of multiple AI agents, each with unique roles, goals, and tools. These agents collaborate on a series of tasks, defined in `config/tasks.yaml`, leveraging their collective skills to achieve complex objectives. The `config/agents.yaml` file outlines the capabilities and configurations of each agent in your crew.
-
-## Support
-
-For support, questions, or feedback regarding the {{crew_name}} Crew or crewAI.
-
-- Visit our [documentation](https://docs.crewai.com)
-- Reach out to us through our [GitHub repository](https://github.com/joaomdmoura/crewai)
-- [Join our Discord](https://discord.com/invite/X4JWnZnxPb)
-- [Chat with our docs](https://chatg.pt/DWjSBZn)
-
-Let's create wonders together with the power and simplicity of crewAI.
+Happy Cooding <3
