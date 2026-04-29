@@ -1,7 +1,7 @@
 name: 🤖 Reusable AI Code Review
 
 on:
-  workflow_call:   # ← this is what makes it reusable
+  workflow_call:  
     inputs:
       pr_number:
         required: true
@@ -27,7 +27,7 @@ jobs:
       - name: Checkout CENTRAL repo (review logic lives here)
         uses: actions/checkout@v4
         with:
-          repository: ankithverma04/ai-review-central  # ← update this
+          repository: ankithverma04/PR-review-agentic-system
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python
